@@ -1,4 +1,5 @@
 from collections import deque
+import random
 
 
 class Board:
@@ -10,7 +11,13 @@ class Board:
         self.winner = None
 
     def get_state(self):
-        return tuple(item for row in self.board for item in row)
+        board_tuple = tuple(item for row in self.board for item in row)
+        x_pieces_tuple = tuple(self.pieces['X'])
+        o_pieces_tuple = tuple(self.pieces['O'])
+        
+        # 3. Combina tudo numa única tupla imutável.
+        return (board_tuple, x_pieces_tuple, o_pieces_tuple)
+
 
     def make_move(self, row, col, player):
         if self.board[row][col] != "":
@@ -63,3 +70,51 @@ class Board:
         for row in self.board:
             print(f"| {' | '.join(p if p != '' else ' ' for p in row)} |")
             print("-" * 13)
+
+class Agent:
+    def __init__(self, player_symbol):
+        self.player_symbol = player_symbol
+        self.q_table = {}
+        self.learning_rate = 0.1
+        self.discount_factor = 0.9
+        self.exploration_rate = 1
+        self.history = []
+
+    def choose_action(self, board):
+        possible_moves = board.get_possible_moves()
+
+        if not possible_moves:
+            return None
+
+        state = board.get_state()
+
+        if random.random() < self.exploration_rate:
+            action = random.choice(possible_moves)
+        else:
+            if state in self.q_table and self.q_table[state]:
+                action = max(self.q_table[state], key=self.q_table[state].get)
+            else:
+                action = random.choice(possible_moves)
+
+        self.history.append((state, action))
+        return action
+    
+    def update_q_table(self, reward):
+        current_reward = reward
+        
+        for state, action in reversed(self.history):
+            old_q_value = self.get_q_value(state, action)
+
+            new_q_value = old_q_value + self.learning_rate * (current_reward - old_q_value)
+
+            self.q_table.setdefault(state, {})
+            self.q_table[state][action] = new_q_value
+
+            current_reward = new_q_value * self.discount_factor
+
+        self.history = []
+
+    def get_q_value(self, state, action):
+        actions_dict = self.q_table.get(state, {})
+
+        return actions_dict.get(action, 0.0)
